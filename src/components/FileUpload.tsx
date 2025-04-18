@@ -70,7 +70,7 @@ export function FileUpload({ onFileUpload, isProcessing }: FileUploadProps) {
           </h3>
 
           <p className="text-sm text-muted-foreground text-center mb-4">
-            Drag and drop your Netflix viewing history CSV file, or click to browse
+            Drag and drop your streaming service viewing history CSV file, or click to browse
           </p>
 
           <Button disabled={isProcessing}>

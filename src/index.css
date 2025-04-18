@@ -4,8 +4,8 @@
 
 @layer base {
   :root {
-    /* Setting dark theme by default to match Netflix */
-    --background: 0 0% 8%; /* Netflix dark background */
+    /* Setting dark theme by default to match the iquit app design */
+    --background: 0 0% 8%; /* Dark background */
     --foreground: 0 0% 100%; /* White text */
 
     --card: 0 0% 12%; /* Slightly lighter cards */
@@ -14,7 +14,7 @@
     --popover: 0 0% 12%;
     --popover-foreground: 0 0% 100%;
 
-    --primary: 0 84% 49%; /* Netflix red */
+    --primary: 0 84% 49%; /* Primary red accent */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 0 0% 16%;
@@ -23,7 +23,7 @@
     --muted: 0 0% 20%;
     --muted-foreground: 0 0% 70%;
 
-    --accent: 0 84% 49%; /* Netflix red accent */
+    --accent: 0 84% 49%; /* Red accent */
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;

@@ -29,8 +29,10 @@ const renderHeader = (handleReset: () => void) => (
   <>
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Stream Sense</h1>
-        <p className="text-muted-foreground">Your Netflix viewing history analysis</p>
+        <h1 className="text-3xl font-bold tracking-tight">iquit</h1>
+        <p className="text-muted-foreground">
+          Save your streaming history before canceling subscriptions
+        </p>
       </div>
 
       <Button variant="outline" onClick={handleReset} className="flex items-center gap-2">
@@ -181,13 +183,13 @@ const useHistoryHandlers = (state: ReturnType<typeof useHistoryState>) => {
   const handleProcessingError = (err: unknown) => {
     console.error('Error processing file:', err);
     state.setError(
-      'Failed to process the file. Please try again with a valid Netflix viewing history CSV.'
+      'Failed to process the file. Please try again with a valid streaming service viewing history CSV.'
     );
 
     toast({
       variant: 'destructive',
       title: 'Error processing file',
-      description: "Make sure you've uploaded a valid Netflix viewing history CSV file.",
+      description: "Make sure you've uploaded a valid viewing history CSV file.",
     });
   };
 

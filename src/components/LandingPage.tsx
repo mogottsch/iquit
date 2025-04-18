@@ -16,14 +16,14 @@ export function LandingPage({ onFileUpload, isProcessing }: LandingPageProps) {
   return (
     <div className="flex flex-col items-center text-center space-y-8 max-w-xl mx-auto">
       <div className="space-y-4">
-        <h1 className="text-4xl font-bold tracking-tight">Stream Sense</h1>
+        <h1 className="text-4xl font-bold tracking-tight">iquit</h1>
         <p className="text-xl text-muted-foreground">
-          Discover insights from your Netflix viewing history
+          Take your viewing history with you when you quit streaming services
         </p>
       </div>
 
       <div className="space-y-2 text-center">
-        <p>Follow these steps to analyze your viewing history:</p>
+        <p>Follow these steps to preserve your viewing history:</p>
         <ol className="list-decimal text-left space-y-4 mx-auto pl-6 pt-4">
           <li>
             <p className="font-medium">Download your Netflix viewing history</p>
@@ -57,8 +57,8 @@ export function LandingPage({ onFileUpload, isProcessing }: LandingPageProps) {
 
       <div className="text-xs text-muted-foreground max-w-sm pt-6">
         <p>
-          This tool is not affiliated with Netflix. We don't store any of your data. All processing
-          happens in your browser.
+          This tool is not affiliated with any streaming service. We don't store any of your data.
+          All processing happens in your browser.
         </p>
       </div>
     </div>

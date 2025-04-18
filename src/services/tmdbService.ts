@@ -376,9 +376,9 @@ export const saveDataToLocalStorage = (mediaItems: MediaItem[], stats: StatsData
       itemCount: mediaItems.length,
       statsAvailable: !!stats,
     });
-    localStorage.setItem('netflix-media-items', JSON.stringify(mediaItems));
-    localStorage.setItem('netflix-stats', JSON.stringify(stats));
-    localStorage.setItem('netflix-data-timestamp', Date.now().toString());
+    localStorage.setItem('iquit-media-items', JSON.stringify(mediaItems));
+    localStorage.setItem('iquit-stats', JSON.stringify(stats));
+    localStorage.setItem('iquit-data-timestamp', Date.now().toString());
   } catch (error) {
     console.error('Error saving data to localStorage:', error);
   }
@@ -393,9 +393,9 @@ export const loadDataFromLocalStorage = (): {
   timestamp: number | null;
 } => {
   try {
-    const mediaItemsJson = localStorage.getItem('netflix-media-items');
-    const statsJson = localStorage.getItem('netflix-stats');
-    const timestampStr = localStorage.getItem('netflix-data-timestamp');
+    const mediaItemsJson = localStorage.getItem('iquit-media-items');
+    const statsJson = localStorage.getItem('iquit-stats');
+    const timestampStr = localStorage.getItem('iquit-data-timestamp');
 
     const parsedItems = mediaItemsJson ? JSON.parse(mediaItemsJson) : null;
     const parsedStats = statsJson ? JSON.parse(statsJson) : null;
@@ -418,9 +418,9 @@ export const loadDataFromLocalStorage = (): {
  */
 export const clearLocalStorageData = (): void => {
   try {
-    localStorage.removeItem('netflix-media-items');
-    localStorage.removeItem('netflix-stats');
-    localStorage.removeItem('netflix-data-timestamp');
+    localStorage.removeItem('iquit-media-items');
+    localStorage.removeItem('iquit-stats');
+    localStorage.removeItem('iquit-data-timestamp');
   } catch (error) {
     console.error('Error clearing localStorage data:', error);
   }
@@ -435,10 +435,10 @@ export const saveProcessingState = (
   partialItems: MediaItem[]
 ): void => {
   try {
-    localStorage.setItem('netflix-viewing-history', JSON.stringify(viewingHistory));
-    localStorage.setItem('netflix-processed-count', processedCount.toString());
-    localStorage.setItem('netflix-partial-items', JSON.stringify(partialItems));
-    localStorage.setItem('netflix-processing-active', 'true');
+    localStorage.setItem('iquit-viewing-history', JSON.stringify(viewingHistory));
+    localStorage.setItem('iquit-processed-count', processedCount.toString());
+    localStorage.setItem('iquit-partial-items', JSON.stringify(partialItems));
+    localStorage.setItem('iquit-processing-active', 'true');
   } catch (error) {
     console.error('Error saving processing state to localStorage:', error);
   }
@@ -454,10 +454,10 @@ export const loadProcessingState = (): {
   isProcessing: boolean;
 } => {
   try {
-    const viewingHistoryJson = localStorage.getItem('netflix-viewing-history');
-    const processedCountStr = localStorage.getItem('netflix-processed-count');
-    const partialItemsJson = localStorage.getItem('netflix-partial-items');
-    const isProcessingStr = localStorage.getItem('netflix-processing-active');
+    const viewingHistoryJson = localStorage.getItem('iquit-viewing-history');
+    const processedCountStr = localStorage.getItem('iquit-processed-count');
+    const partialItemsJson = localStorage.getItem('iquit-partial-items');
+    const isProcessingStr = localStorage.getItem('iquit-processing-active');
 
     return {
       viewingHistory: viewingHistoryJson ? JSON.parse(viewingHistoryJson) : null,
@@ -476,10 +476,10 @@ export const loadProcessingState = (): {
  */
 export const clearProcessingState = (): void => {
   try {
-    localStorage.removeItem('netflix-viewing-history');
-    localStorage.removeItem('netflix-processed-count');
-    localStorage.removeItem('netflix-partial-items');
-    localStorage.removeItem('netflix-processing-active');
+    localStorage.removeItem('iquit-viewing-history');
+    localStorage.removeItem('iquit-processed-count');
+    localStorage.removeItem('iquit-partial-items');
+    localStorage.removeItem('iquit-processing-active');
   } catch (error) {
     console.error('Error clearing processing state from localStorage:', error);
   }
@@ -490,7 +490,7 @@ export const clearProcessingState = (): void => {
  */
 export const completeProcessing = (): void => {
   try {
-    localStorage.removeItem('netflix-processing-active');
+    localStorage.removeItem('iquit-processing-active');
   } catch (error) {
     console.error('Error updating processing state in localStorage:', error);
   }
