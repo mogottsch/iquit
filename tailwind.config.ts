@@ -52,6 +52,14 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
+				netflix: {
+					DEFAULT: '#E50914',
+					dark: '#B20710',
+					light: '#F40612',
+					black: '#141414',
+					gray: '#808080',
+					text: '#FFFFFF',
+				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',
