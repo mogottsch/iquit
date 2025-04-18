@@ -305,3 +305,62 @@ export const generateStats = (mediaItems: MediaItem[]): StatsData => {
     continueWatchingShows,
   };
 };
+
+/**
+ * Save media items and stats to localStorage
+ */
+export const saveDataToLocalStorage = (mediaItems: MediaItem[], stats: StatsData): void => {
+  try {
+    console.log('Saving data to localStorage:', {
+      itemCount: mediaItems.length,
+      statsAvailable: !!stats,
+    });
+    localStorage.setItem('netflix-media-items', JSON.stringify(mediaItems));
+    localStorage.setItem('netflix-stats', JSON.stringify(stats));
+    localStorage.setItem('netflix-data-timestamp', Date.now().toString());
+  } catch (error) {
+    console.error('Error saving data to localStorage:', error);
+  }
+};
+
+/**
+ * Load media items and stats from localStorage
+ */
+export const loadDataFromLocalStorage = (): {
+  mediaItems: MediaItem[] | null;
+  stats: StatsData | null;
+  timestamp: number | null;
+} => {
+  try {
+    const mediaItemsJson = localStorage.getItem('netflix-media-items');
+    const statsJson = localStorage.getItem('netflix-stats');
+    const timestampStr = localStorage.getItem('netflix-data-timestamp');
+
+    const parsedItems = mediaItemsJson ? JSON.parse(mediaItemsJson) : null;
+    const parsedStats = statsJson ? JSON.parse(statsJson) : null;
+
+    // Only return valid data (arrays must not be empty)
+    return {
+      mediaItems:
+        parsedItems && Array.isArray(parsedItems) && parsedItems.length > 0 ? parsedItems : null,
+      stats: parsedStats ? parsedStats : null,
+      timestamp: timestampStr ? parseInt(timestampStr, 10) : null,
+    };
+  } catch (error) {
+    console.error('Error loading data from localStorage:', error);
+    return { mediaItems: null, stats: null, timestamp: null };
+  }
+};
+
+/**
+ * Clear saved data from localStorage
+ */
+export const clearLocalStorageData = (): void => {
+  try {
+    localStorage.removeItem('netflix-media-items');
+    localStorage.removeItem('netflix-stats');
+    localStorage.removeItem('netflix-data-timestamp');
+  } catch (error) {
+    console.error('Error clearing localStorage data:', error);
+  }
+};

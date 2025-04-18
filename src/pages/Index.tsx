@@ -1,5 +1,5 @@
 import { AlertCircle, RefreshCw } from 'lucide-react';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 import { LandingPage } from '@/components/LandingPage';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -12,7 +12,13 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/useToast';
 import { parseNetflixCSV } from '@/services/csvService';
-import { processViewingHistory, generateStats } from '@/services/tmdbService';
+import {
+  processViewingHistory,
+  generateStats,
+  saveDataToLocalStorage,
+  loadDataFromLocalStorage,
+  clearLocalStorageData,
+} from '@/services/tmdbService';
 import { MediaItem, NetflixViewingItem, StatsData } from '@/types';
 
 const renderHeader = (handleReset: () => void) => (
@@ -207,6 +213,28 @@ const useNetflixHistory = () => {
   const state = useHistoryState();
   const handlers = useHistoryHandlers(state);
 
+  useEffect(() => {
+    const loadSavedData = () => {
+      try {
+        const { mediaItems, stats } = loadDataFromLocalStorage();
+        console.log('Attempting to load from localStorage:', {
+          mediaItemsFound: !!mediaItems,
+          statsFound: !!stats,
+          itemCount: mediaItems?.length || 0,
+        });
+
+        if (mediaItems && stats) {
+          state.setMediaItems(mediaItems);
+          state.setStats(stats);
+        }
+      } catch (error) {
+        console.error('Error in loadSavedData:', error);
+      }
+    };
+
+    loadSavedData();
+  }, []);
+
   const handleFileUpload = async (file: File) => {
     state.setIsProcessing(true);
     state.setProgress(null);
@@ -234,6 +262,9 @@ const useNetflixHistory = () => {
       state.setMediaItems(processedMedia);
       state.setStats(statsData);
 
+      // Save data to localStorage
+      saveDataToLocalStorage(processedMedia, statsData);
+
       handlers.toast({
         title: 'Analysis complete',
         description: `Processed ${processedMedia.length} unique titles`,
@@ -248,6 +279,7 @@ const useNetflixHistory = () => {
   const handleReset = () => {
     handlers.resetData();
     handlers.clearError();
+    clearLocalStorageData();
   };
 
   return {
@@ -276,20 +308,40 @@ const Index = () => {
     handleReset,
   } = useNetflixHistory();
 
-  if (viewingHistory.length === 0 && !isProcessing) {
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  useEffect(() => {
+    // Mark data as loaded after initial load attempt
+    const timer = setTimeout(() => {
+      setDataLoaded(true);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!dataLoaded) {
     return (
-      <div className="container mx-auto py-12">
-        <LandingPage onFileUpload={handleFileUpload} isProcessing={isProcessing} />
+      <div className="container mx-auto py-12 flex justify-center items-center">
+        <LoadingSpinner text="Loading..." />
       </div>
     );
   }
 
+  // If we have media items and stats, show results
+  if (mediaItems.length > 0 && stats) {
+    return (
+      <div className="container mx-auto py-8 space-y-8">
+        {renderHeader(handleReset)}
+        {error && renderError(error)}
+        {isProcessing && renderLoading(progress, partialMediaItems)}
+        {renderResults(mediaItems, stats)}
+      </div>
+    );
+  }
+
+  // Otherwise show the landing page
   return (
-    <div className="container mx-auto py-8 space-y-8">
-      {renderHeader(handleReset)}
-      {error && renderError(error)}
-      {isProcessing && renderLoading(progress, partialMediaItems)}
-      {!isProcessing && stats && renderResults(mediaItems, stats)}
+    <div className="container mx-auto py-12">
+      <LandingPage onFileUpload={handleFileUpload} isProcessing={isProcessing} />
     </div>
   );
 };
