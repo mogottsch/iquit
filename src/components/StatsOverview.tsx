@@ -1,7 +1,7 @@
-
-import { StatsData } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Film, Tv, CalendarClock, Award } from 'lucide-react';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatsData } from '@/types';
 
 interface StatsOverviewProps {
   stats: StatsData;
@@ -12,16 +12,14 @@ export function StatsOverview({ stats }: StatsOverviewProps) {
   const getMostActive = (data: Record<string, number>): { period: string; count: number } => {
     const entries = Object.entries(data);
     if (entries.length === 0) return { period: 'None', count: 0 };
-    
-    const max = entries.reduce((max, current) => 
-      current[1] > max[1] ? current : max, entries[0]);
-    
+
+    const max = entries.reduce((max, current) => (current[1] > max[1] ? current : max), entries[0]);
+
     return { period: max[0], count: max[1] };
   };
-  
+
   const mostActiveMonth = getMostActive(stats.watchedByMonth);
-  const mostActiveYear = getMostActive(stats.watchedByYear);
-  
+
   // Format month for display
   const formatMonth = (month: string) => {
     if (month === 'None') return 'None';
@@ -42,12 +40,10 @@ export function StatsOverview({ stats }: StatsOverviewProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{stats.totalWatched}</div>
-          <p className="text-xs text-muted-foreground">
-            Movies and TV shows combined
-          </p>
+          <p className="text-xs text-muted-foreground">Movies and TV shows combined</p>
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
           <CardTitle className="text-sm font-medium">Movies</CardTitle>
@@ -60,7 +56,7 @@ export function StatsOverview({ stats }: StatsOverviewProps) {
           </p>
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
           <CardTitle className="text-sm font-medium">TV Shows</CardTitle>
@@ -73,7 +69,7 @@ export function StatsOverview({ stats }: StatsOverviewProps) {
           </p>
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
           <CardTitle className="text-sm font-medium">Most Active</CardTitle>
@@ -81,9 +77,7 @@ export function StatsOverview({ stats }: StatsOverviewProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{mostActiveMonth.count} views</div>
-          <p className="text-xs text-muted-foreground">
-            in {formatMonth(mostActiveMonth.period)}
-          </p>
+          <p className="text-xs text-muted-foreground">in {formatMonth(mostActiveMonth.period)}</p>
         </CardContent>
       </Card>
     </div>

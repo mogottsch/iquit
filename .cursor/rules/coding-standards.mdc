@@ -1,0 +1,16 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Coding Standards
+
+1. No comments ever. Code must be self-explanatory. If code appears to need comments, it's too complex and should be split into smaller functions with descriptive names.
+
+2. Use linters and precommit hooks. Check for linter errors after each large change, every time.
+
+3. Prefer functional programming over OOP, but remain pragmatic with implementation choices.
+
+4. Small functions are always preferred over large ones. Break down complex logic into smaller, well-named functions.
+
+5. Use strict typing wherever possible. Avoid any and unknown types unless absolutely necessary.

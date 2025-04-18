@@ -1,4 +1,3 @@
-
 export interface NetflixViewingItem {
   title: string;
   date: string;
@@ -37,6 +36,6 @@ export interface StatsData {
 }
 
 export interface CSVData {
-  'Title': string;
-  'Date': string;
+  Title: string;
+  Date: string;
 }

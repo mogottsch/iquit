@@ -1,9 +1,11 @@
-
-import { Button } from '@/components/ui/button';
-import { FileUpload } from './FileUpload';
 import { ExternalLink } from 'lucide-react';
 
+import { FileUpload } from './FileUpload';
+
+import { Button } from '@/components/ui/button';
+
 interface LandingPageProps {
+  // eslint-disable-next-line no-unused-vars
   onFileUpload: (file: File) => void;
   isProcessing: boolean;
 }
@@ -29,11 +31,7 @@ export function LandingPage({ onFileUpload, isProcessing }: LandingPageProps) {
               Visit your Netflix Account page and go to Viewing Activity
             </p>
             <Button variant="outline" size="sm" className="flex items-center" asChild>
-              <a 
-                href={NETFLIX_ACTIVITY_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <a href={NETFLIX_ACTIVITY_URL} target="_blank" rel="noopener noreferrer">
                 Go to Netflix Activity <ExternalLink className="ml-2 h-3 w-3" />
               </a>
             </Button>
@@ -59,8 +57,8 @@ export function LandingPage({ onFileUpload, isProcessing }: LandingPageProps) {
 
       <div className="text-xs text-muted-foreground max-w-sm pt-6">
         <p>
-          This tool is not affiliated with Netflix. We don't store any of your data.
-          All processing happens in your browser.
+          This tool is not affiliated with Netflix. We don't store any of your data. All processing
+          happens in your browser.
         </p>
       </div>
     </div>
