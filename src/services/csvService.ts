@@ -20,7 +20,7 @@ export const parseNetflixCSV = (file: File): Promise<NetflixViewingItem[]> => {
             rawTitle: item.Title,
             rawDate: item.Date,
           }))
-          .slice(0, 100);
+          .slice(0, 500);
         resolve(viewingHistory);
       },
       error: (error: any) => {

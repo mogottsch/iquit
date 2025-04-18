@@ -18,6 +18,10 @@ import {
   saveDataToLocalStorage,
   loadDataFromLocalStorage,
   clearLocalStorageData,
+  saveProcessingState,
+  loadProcessingState,
+  clearProcessingState,
+  cancelProcessing,
 } from '@/services/tmdbService';
 import { MediaItem, NetflixViewingItem, StatsData } from '@/types';
 
@@ -78,15 +82,15 @@ const renderLoading = (
           Showing titles as they're processed. More will appear as analysis continues...
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {partialResults.slice(0, 15).map((item) => (
+          {partialResults.slice(0, 20).map((item) => (
             <div key={`partial-${item.id}`} className="col-span-1">
               <MediaCard item={item} />
             </div>
           ))}
         </div>
-        {partialResults.length > 15 && (
+        {partialResults.length > 20 && (
           <p className="text-sm text-muted-foreground mt-4 text-center">
-            + {partialResults.length - 15} more items being processed...
+            + {partialResults.length - 20} more items being processed...
           </p>
         )}
       </div>
@@ -138,6 +142,7 @@ const useHistoryState = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<{ processed: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showLandingPage, setShowLandingPage] = useState(true);
 
   return {
     viewingHistory,
@@ -154,6 +159,8 @@ const useHistoryState = () => {
     setProgress,
     error,
     setError,
+    showLandingPage,
+    setShowLandingPage,
   };
 };
 
@@ -168,6 +175,7 @@ const useHistoryHandlers = (state: ReturnType<typeof useHistoryState>) => {
     state.setPartialMediaItems([]);
     state.setStats(null);
     state.setProgress(null);
+    state.setShowLandingPage(true);
   };
 
   const handleProcessingError = (err: unknown) => {
@@ -185,10 +193,21 @@ const useHistoryHandlers = (state: ReturnType<typeof useHistoryState>) => {
 
   const handleItemProcessed = (item: MediaItem) => {
     state.setPartialMediaItems((prev) => {
+      // Check if we already have this item
       if (prev.some((existingItem) => existingItem.id === item.id)) {
-        return prev;
+        // Update existing item
+        return prev.map((existingItem) =>
+          existingItem.id === item.id
+            ? { ...existingItem, watchCount: (existingItem.watchCount || 1) + 1 }
+            : existingItem
+        );
       }
-      return [...prev, item].sort(
+
+      // Add new item
+      const newItems = [...prev, item];
+
+      // Sort by most recently watched
+      return newItems.sort(
         (a, b) => new Date(b.watchedDate).getTime() - new Date(a.watchedDate).getTime()
       );
     });
@@ -214,21 +233,93 @@ const useNetflixHistory = () => {
   const handlers = useHistoryHandlers(state);
 
   useEffect(() => {
-    const loadSavedData = () => {
+    const loadSavedData = async () => {
       try {
-        const { mediaItems, stats } = loadDataFromLocalStorage();
-        console.log('Attempting to load from localStorage:', {
-          mediaItemsFound: !!mediaItems,
-          statsFound: !!stats,
-          itemCount: mediaItems?.length || 0,
+        // First check if there's an in-progress processing job
+        const { viewingHistory, processedCount, partialItems, isProcessing } =
+          loadProcessingState();
+
+        console.log('Checking for in-progress processing:', {
+          hasHistory: !!viewingHistory && viewingHistory.length > 0,
+          processedCount,
+          hasPartialItems: !!partialItems && partialItems.length > 0,
+          isProcessing,
         });
 
+        if (viewingHistory && viewingHistory.length > 0 && isProcessing) {
+          // We have an in-progress job to resume
+          console.log('Resuming processing from index:', processedCount);
+
+          // Set initial state
+          state.setViewingHistory(viewingHistory);
+          state.setIsProcessing(true);
+          state.setShowLandingPage(false);
+
+          if (partialItems && partialItems.length > 0) {
+            state.setPartialMediaItems(partialItems);
+          }
+
+          // Resume processing
+          state.setProgress({ processed: processedCount, total: viewingHistory.length });
+
+          // Use a slight delay to allow UI to update first
+          setTimeout(async () => {
+            try {
+              // Create a map from partial items to maintain state
+              const mediaMap = new Map<string, MediaItem>();
+              if (partialItems) {
+                partialItems.forEach((item) => {
+                  mediaMap.set(`${item.id}-${item.type}`, item);
+                });
+              }
+
+              // Resume processing from where we left off
+              const { mediaItems: processedMedia, cancelled } = await processViewingHistory(
+                viewingHistory,
+                handlers.handleProgress,
+                handlers.handleItemProcessed,
+                processedCount,
+                mediaMap
+              );
+
+              // Only proceed with stats calculation and success message if not cancelled
+              if (!cancelled) {
+                const stats = generateStats(processedMedia);
+                state.setMediaItems(processedMedia);
+                state.setStats(stats);
+
+                // Save completed data
+                saveDataToLocalStorage(processedMedia, stats);
+                clearProcessingState();
+
+                handlers.toast({
+                  title: 'Analysis complete',
+                  description: `Processed ${processedMedia.length} unique titles`,
+                });
+              }
+            } catch (err) {
+              handlers.handleProcessingError(err);
+            } finally {
+              state.setIsProcessing(false);
+            }
+          }, 500);
+
+          return true; // Indicates we're resuming processing
+        }
+
+        // If no in-progress job, check for completed data
+        const { mediaItems, stats } = loadDataFromLocalStorage();
         if (mediaItems && stats) {
           state.setMediaItems(mediaItems);
           state.setStats(stats);
+          state.setShowLandingPage(false);
+          return true; // Indicates we found saved data
         }
+
+        return false; // No saved data found
       } catch (error) {
         console.error('Error in loadSavedData:', error);
+        return false;
       }
     };
 
@@ -239,7 +330,11 @@ const useNetflixHistory = () => {
     state.setIsProcessing(true);
     state.setProgress(null);
     state.setPartialMediaItems([]);
+    state.setShowLandingPage(false);
     handlers.clearError();
+
+    // Clear any existing processing state
+    clearProcessingState();
 
     try {
       // Parse the CSV file
@@ -251,24 +346,31 @@ const useNetflixHistory = () => {
         description: `Found ${history.length} viewing history items`,
       });
 
+      // Save the initial state to enable resuming if page is refreshed
+      saveProcessingState(history, 0, []);
+
       // Process the viewing history
-      const processedMedia = await processViewingHistory(
+      const { mediaItems: processedMedia, cancelled } = await processViewingHistory(
         history,
         handlers.handleProgress,
         handlers.handleItemProcessed
       );
 
-      const statsData = generateStats(processedMedia);
-      state.setMediaItems(processedMedia);
-      state.setStats(statsData);
+      // Only proceed with stats calculation and success message if not cancelled
+      if (!cancelled) {
+        const stats = generateStats(processedMedia);
+        state.setMediaItems(processedMedia);
+        state.setStats(stats);
 
-      // Save data to localStorage
-      saveDataToLocalStorage(processedMedia, statsData);
+        // Save data to localStorage
+        saveDataToLocalStorage(processedMedia, stats);
+        clearProcessingState();
 
-      handlers.toast({
-        title: 'Analysis complete',
-        description: `Processed ${processedMedia.length} unique titles`,
-      });
+        handlers.toast({
+          title: 'Analysis complete',
+          description: `Processed ${processedMedia.length} unique titles`,
+        });
+      }
     } catch (err) {
       handlers.handleProcessingError(err);
     } finally {
@@ -277,9 +379,29 @@ const useNetflixHistory = () => {
   };
 
   const handleReset = () => {
+    // Cancel any ongoing processing first
+    cancelProcessing();
+
+    // Then reset all state - make sure to completely clear mediaItems
     handlers.resetData();
+    state.setMediaItems([]);
+    state.setPartialMediaItems([]);
+    state.setStats(null);
+
+    // Force back to landing page
+    state.setShowLandingPage(true);
+
     handlers.clearError();
     clearLocalStorageData();
+    clearProcessingState();
+
+    // Force UI update
+    state.setIsProcessing(false);
+
+    handlers.toast({
+      title: 'Reset complete',
+      description: 'Analysis has been cancelled and data cleared',
+    });
   };
 
   return {
@@ -290,6 +412,7 @@ const useNetflixHistory = () => {
     stats: state.stats,
     isProcessing: state.isProcessing,
     progress: state.progress,
+    showLandingPage: state.showLandingPage,
     handleFileUpload,
     handleReset,
   };
@@ -304,6 +427,7 @@ const Index = () => {
     stats,
     isProcessing,
     progress,
+    showLandingPage,
     handleFileUpload,
     handleReset,
   } = useNetflixHistory();
@@ -311,7 +435,6 @@ const Index = () => {
   const [dataLoaded, setDataLoaded] = useState(false);
 
   useEffect(() => {
-    // Mark data as loaded after initial load attempt
     const timer = setTimeout(() => {
       setDataLoaded(true);
     }, 500);
@@ -326,19 +449,38 @@ const Index = () => {
     );
   }
 
-  // If we have media items and stats, show results
+  // If reset was called or we're in initial state, show landing page
+  if (showLandingPage) {
+    return (
+      <div className="container mx-auto py-12">
+        <LandingPage onFileUpload={handleFileUpload} isProcessing={isProcessing} />
+      </div>
+    );
+  }
+
+  // Show loading UI with partial results during processing
+  if (isProcessing) {
+    return (
+      <div className="container mx-auto py-8 space-y-8">
+        {renderHeader(handleReset)}
+        {error && renderError(error)}
+        {renderLoading(progress, partialMediaItems)}
+      </div>
+    );
+  }
+
+  // Show results if we have completed data
   if (mediaItems.length > 0 && stats) {
     return (
       <div className="container mx-auto py-8 space-y-8">
         {renderHeader(handleReset)}
         {error && renderError(error)}
-        {isProcessing && renderLoading(progress, partialMediaItems)}
         {renderResults(mediaItems, stats)}
       </div>
     );
   }
 
-  // Otherwise show the landing page
+  // Fallback: show landing page if nothing else matched
   return (
     <div className="container mx-auto py-12">
       <LandingPage onFileUpload={handleFileUpload} isProcessing={isProcessing} />

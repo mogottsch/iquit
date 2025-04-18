@@ -14,6 +14,25 @@ const TMDB_IMG_URL = 'https://image.tmdb.org/t/p';
 const POSTER_SIZE = 'w342';
 const BACKDROP_SIZE = 'w1280';
 
+// Global cancellation flag to abort processing
+let processingCancelled = false;
+
+/**
+ * Cancel any ongoing processing
+ */
+export const cancelProcessing = (): void => {
+  processingCancelled = true;
+  clearProcessingState();
+  console.log('Processing cancelled');
+};
+
+/**
+ * Reset the cancellation flag
+ */
+export const resetCancellation = (): void => {
+  processingCancelled = false;
+};
+
 /**
  * Search for a movie or TV show
  * @param query The search query (title)
@@ -189,18 +208,29 @@ const processBatch = async (
 };
 
 /**
- * Report newly processed item if it matches the batch
+ * Report newly processed items to the callback
  */
 const reportProcessedItem = (
   mediaMap: Map<string, MediaItem>,
-  batchItem: NetflixViewingItem,
+  batchItems: NetflixViewingItem[],
   onItemProcessed: (item: MediaItem) => void
 ): void => {
-  // Find and report all newly processed items that match the batch
-  // This approach is more thorough than the previous implementation
-  for (const mediaItem of mediaMap.values()) {
-    // Report each item directly instead of trying to match by title
-    onItemProcessed(mediaItem);
+  // Process each item in the current batch
+  for (const batchItem of batchItems) {
+    const cleanedTitle = cleanTitle(batchItem.title);
+
+    // Find media items that match this batch item's title
+    for (const mediaItem of mediaMap.values()) {
+      // Check if this media item was created from this batch item
+      // Simple check: title similarity and watched date match
+      if (
+        (mediaItem.title.toLowerCase().includes(cleanedTitle.toLowerCase()) ||
+          cleanedTitle.toLowerCase().includes(mediaItem.title.toLowerCase())) &&
+        mediaItem.watchedDate === batchItem.date
+      ) {
+        onItemProcessed(mediaItem);
+      }
+    }
   }
 };
 
@@ -210,12 +240,26 @@ const reportProcessedItem = (
 export const processViewingHistory = async (
   viewingHistory: NetflixViewingItem[],
   progressCallback?: (currentCount: number, totalCount: number) => void,
-  onItemProcessed?: (item: MediaItem) => void
-): Promise<MediaItem[]> => {
-  const mediaMap = new Map<string, MediaItem>();
+  onItemProcessed?: (item: MediaItem) => void,
+  startIndex: number = 0,
+  existingMediaMap?: Map<string, MediaItem>
+): Promise<{ mediaItems: MediaItem[]; cancelled: boolean }> => {
+  // Reset cancellation flag at the start
+  resetCancellation();
+
+  const mediaMap = existingMediaMap || new Map<string, MediaItem>();
   const batchSize = 40;
 
-  for (let i = 0; i < viewingHistory.length; i += batchSize) {
+  for (let i = startIndex; i < viewingHistory.length; i += batchSize) {
+    // Check if processing has been cancelled
+    if (processingCancelled) {
+      console.log('Processing aborted at index', i);
+      return {
+        mediaItems: Array.from(mediaMap.values()),
+        cancelled: true,
+      };
+    }
+
     const batch = viewingHistory.slice(i, i + batchSize);
     await processBatch(batch, mediaMap);
 
@@ -224,17 +268,34 @@ export const processViewingHistory = async (
     }
 
     if (onItemProcessed && batch.length > 0) {
-      reportProcessedItem(mediaMap, batch[0], onItemProcessed);
+      reportProcessedItem(mediaMap, batch, onItemProcessed);
     }
 
+    // Save current state periodically to support resuming on refresh
+    if (i % 10 === 0 && i > startIndex) {
+      saveProcessingState(viewingHistory, i, Array.from(mediaMap.values()));
+    }
+
+    // Force UI update by yielding to event loop for larger batches
+    if (i % 10 === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    // Add a small delay between batches to avoid rate limiting
     if (i + batchSize < viewingHistory.length) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
   }
 
-  return Array.from(mediaMap.values()).sort(
-    (a, b) => new Date(b.watchedDate).getTime() - new Date(a.watchedDate).getTime()
-  );
+  // Processing complete
+  completeProcessing();
+
+  return {
+    mediaItems: Array.from(mediaMap.values()).sort(
+      (a, b) => new Date(b.watchedDate).getTime() - new Date(a.watchedDate).getTime()
+    ),
+    cancelled: false,
+  };
 };
 
 /**
@@ -362,5 +423,75 @@ export const clearLocalStorageData = (): void => {
     localStorage.removeItem('netflix-data-timestamp');
   } catch (error) {
     console.error('Error clearing localStorage data:', error);
+  }
+};
+
+/**
+ * Save viewing history and processing state to localStorage
+ */
+export const saveProcessingState = (
+  viewingHistory: NetflixViewingItem[],
+  processedCount: number,
+  partialItems: MediaItem[]
+): void => {
+  try {
+    localStorage.setItem('netflix-viewing-history', JSON.stringify(viewingHistory));
+    localStorage.setItem('netflix-processed-count', processedCount.toString());
+    localStorage.setItem('netflix-partial-items', JSON.stringify(partialItems));
+    localStorage.setItem('netflix-processing-active', 'true');
+  } catch (error) {
+    console.error('Error saving processing state to localStorage:', error);
+  }
+};
+
+/**
+ * Load in-progress processing state from localStorage
+ */
+export const loadProcessingState = (): {
+  viewingHistory: NetflixViewingItem[] | null;
+  processedCount: number;
+  partialItems: MediaItem[] | null;
+  isProcessing: boolean;
+} => {
+  try {
+    const viewingHistoryJson = localStorage.getItem('netflix-viewing-history');
+    const processedCountStr = localStorage.getItem('netflix-processed-count');
+    const partialItemsJson = localStorage.getItem('netflix-partial-items');
+    const isProcessingStr = localStorage.getItem('netflix-processing-active');
+
+    return {
+      viewingHistory: viewingHistoryJson ? JSON.parse(viewingHistoryJson) : null,
+      processedCount: processedCountStr ? parseInt(processedCountStr, 10) : 0,
+      partialItems: partialItemsJson ? JSON.parse(partialItemsJson) : null,
+      isProcessing: isProcessingStr === 'true',
+    };
+  } catch (error) {
+    console.error('Error loading processing state from localStorage:', error);
+    return { viewingHistory: null, processedCount: 0, partialItems: null, isProcessing: false };
+  }
+};
+
+/**
+ * Clear processing state from localStorage
+ */
+export const clearProcessingState = (): void => {
+  try {
+    localStorage.removeItem('netflix-viewing-history');
+    localStorage.removeItem('netflix-processed-count');
+    localStorage.removeItem('netflix-partial-items');
+    localStorage.removeItem('netflix-processing-active');
+  } catch (error) {
+    console.error('Error clearing processing state from localStorage:', error);
+  }
+};
+
+/**
+ * Mark processing as complete
+ */
+export const completeProcessing = (): void => {
+  try {
+    localStorage.removeItem('netflix-processing-active');
+  } catch (error) {
+    console.error('Error updating processing state in localStorage:', error);
   }
 };
