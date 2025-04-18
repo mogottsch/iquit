@@ -60,6 +60,8 @@ export default [
           alphabetize: { order: 'asc' },
         },
       ],
+
+      'no-unused-vars': 'off',
     },
   },
 ];

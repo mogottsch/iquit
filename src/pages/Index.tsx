@@ -1,5 +1,5 @@
 import { AlertCircle, RefreshCw } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 import { LandingPage } from '@/components/LandingPage';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -8,6 +8,7 @@ import { MediaGrid } from '@/components/MediaGrid';
 import { StatsOverview } from '@/components/StatsOverview';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/useToast';
 import { parseNetflixCSV } from '@/services/csvService';
@@ -38,11 +39,53 @@ const renderError = (error: string) => (
   </Alert>
 );
 
-const renderLoading = () => (
-  <LoadingSpinner
-    text="Analyzing your viewing history..."
-    subText="This may take a minute as we fetch metadata for each title"
-  />
+const renderLoading = (
+  progress?: { processed: number; total: number },
+  partialResults?: MediaItem[]
+) => (
+  <div className="space-y-8">
+    <div className="flex flex-col items-center justify-center gap-4">
+      <LoadingSpinner
+        text="Analyzing your viewing history..."
+        subText={
+          progress
+            ? `Processing ${progress.processed} of ${progress.total} items`
+            : 'This may take a minute as we fetch metadata for each title'
+        }
+      />
+      {progress && (
+        <div className="w-full max-w-md">
+          <Progress value={(progress.processed / progress.total) * 100} />
+          <p className="text-xs text-center mt-2 text-muted-foreground">
+            {Math.round((progress.processed / progress.total) * 100)}%
+          </p>
+        </div>
+      )}
+    </div>
+
+    {partialResults && partialResults.length > 0 && (
+      <div>
+        <h2 className="text-xl font-semibold mb-4">
+          Content Discovered So Far ({partialResults.length})
+        </h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Showing titles as they're processed. More will appear as analysis continues...
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          {partialResults.slice(0, 15).map((item) => (
+            <div key={`partial-${item.id}`} className="col-span-1">
+              <MediaCard item={item} />
+            </div>
+          ))}
+        </div>
+        {partialResults.length > 15 && (
+          <p className="text-sm text-muted-foreground mt-4 text-center">
+            + {partialResults.length - 15} more items being processed...
+          </p>
+        )}
+      </div>
+    )}
+  </div>
 );
 
 const renderContinuingShows = (continueWatchingShows: MediaItem[]) => {
@@ -81,48 +124,49 @@ const renderResults = (mediaItems: MediaItem[], stats: StatsData) => (
   </div>
 );
 
-const useNetflixParser = () => {
-  const { toast } = useToast();
-
-  const parseCSVFile = async (file: File) => {
-    const history = await parseNetflixCSV(file);
-
-    toast({
-      title: 'CSV parsed successfully',
-      description: `Found ${history.length} viewing history items`,
-    });
-
-    return history;
-  };
-
-  return { parseCSVFile };
-};
-
-const useMediaProcessor = () => {
-  const { toast } = useToast();
-
-  const processMediaData = async (history: NetflixViewingItem[]) => {
-    const processedMedia = await processViewingHistory(history);
-    const statsData = generateStats(processedMedia);
-
-    toast({
-      title: 'Analysis complete',
-      description: `Processed ${processedMedia.length} unique titles`,
-    });
-
-    return { processedMedia, statsData };
-  };
-
-  return { processMediaData };
-};
-
-const useErrorHandler = () => {
+const useHistoryState = () => {
+  const [viewingHistory, setViewingHistory] = useState<NetflixViewingItem[]>([]);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [partialMediaItems, setPartialMediaItems] = useState<MediaItem[]>([]);
+  const [stats, setStats] = useState<StatsData | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState<{ processed: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  return {
+    viewingHistory,
+    setViewingHistory,
+    mediaItems,
+    setMediaItems,
+    partialMediaItems,
+    setPartialMediaItems,
+    stats,
+    setStats,
+    isProcessing,
+    setIsProcessing,
+    progress,
+    setProgress,
+    error,
+    setError,
+  };
+};
+
+const useHistoryHandlers = (state: ReturnType<typeof useHistoryState>) => {
   const { toast } = useToast();
+
+  const clearError = () => state.setError(null);
+
+  const resetData = () => {
+    state.setViewingHistory([]);
+    state.setMediaItems([]);
+    state.setPartialMediaItems([]);
+    state.setStats(null);
+    state.setProgress(null);
+  };
 
   const handleProcessingError = (err: unknown) => {
     console.error('Error processing file:', err);
-    setError(
+    state.setError(
       'Failed to process the file. Please try again with a valid Netflix viewing history CSV.'
     );
 
@@ -133,90 +177,104 @@ const useErrorHandler = () => {
     });
   };
 
-  const clearError = () => setError(null);
+  const handleItemProcessed = (item: MediaItem) => {
+    state.setPartialMediaItems((prev) => {
+      if (prev.some((existingItem) => existingItem.id === item.id)) {
+        return prev;
+      }
+      return [...prev, item].sort(
+        (a, b) => new Date(b.watchedDate).getTime() - new Date(a.watchedDate).getTime()
+      );
+    });
+  };
 
-  return { error, handleProcessingError, clearError };
-};
-
-const useFileProcessor = () => {
-  const [viewingHistory, setViewingHistory] = useState<NetflixViewingItem[]>([]);
-  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
-  const [stats, setStats] = useState<StatsData | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const resetData = () => {
-    setViewingHistory([]);
-    setMediaItems([]);
-    setStats(null);
+  const handleProgress = (processed: number, total: number) => {
+    state.setProgress({ processed, total });
   };
 
   return {
-    viewingHistory,
-    setViewingHistory,
-    mediaItems,
-    setMediaItems,
-    stats,
-    setStats,
-    isProcessing,
-    setIsProcessing,
+    clearError,
     resetData,
+    handleProcessingError,
+    handleItemProcessed,
+    handleProgress,
+    toast,
   };
 };
 
+// eslint-disable-next-line max-lines-per-function
 const useNetflixHistory = () => {
-  const {
-    viewingHistory,
-    setViewingHistory,
-    mediaItems,
-    setMediaItems,
-    stats,
-    setStats,
-    isProcessing,
-    setIsProcessing,
-    resetData,
-  } = useFileProcessor();
-
-  const { error, handleProcessingError, clearError } = useErrorHandler();
-  const { parseCSVFile } = useNetflixParser();
-  const { processMediaData } = useMediaProcessor();
+  const state = useHistoryState();
+  const handlers = useHistoryHandlers(state);
 
   const handleFileUpload = async (file: File) => {
-    setIsProcessing(true);
-    clearError();
+    state.setIsProcessing(true);
+    state.setProgress(null);
+    state.setPartialMediaItems([]);
+    handlers.clearError();
 
     try {
-      const history = await parseCSVFile(file);
-      setViewingHistory(history);
+      // Parse the CSV file
+      const history = await parseNetflixCSV(file);
+      state.setViewingHistory(history);
 
-      const { processedMedia, statsData } = await processMediaData(history);
-      setMediaItems(processedMedia);
-      setStats(statsData);
+      handlers.toast({
+        title: 'CSV parsed successfully',
+        description: `Found ${history.length} viewing history items`,
+      });
+
+      // Process the viewing history
+      const processedMedia = await processViewingHistory(
+        history,
+        handlers.handleProgress,
+        handlers.handleItemProcessed
+      );
+
+      const statsData = generateStats(processedMedia);
+      state.setMediaItems(processedMedia);
+      state.setStats(statsData);
+
+      handlers.toast({
+        title: 'Analysis complete',
+        description: `Processed ${processedMedia.length} unique titles`,
+      });
     } catch (err) {
-      handleProcessingError(err);
+      handlers.handleProcessingError(err);
     } finally {
-      setIsProcessing(false);
+      state.setIsProcessing(false);
     }
   };
 
   const handleReset = () => {
-    resetData();
-    clearError();
+    handlers.resetData();
+    handlers.clearError();
   };
 
   return {
-    viewingHistory,
-    mediaItems,
-    stats,
-    isProcessing,
-    error,
+    error: state.error,
+    viewingHistory: state.viewingHistory,
+    mediaItems: state.mediaItems,
+    partialMediaItems: state.partialMediaItems,
+    stats: state.stats,
+    isProcessing: state.isProcessing,
+    progress: state.progress,
     handleFileUpload,
     handleReset,
   };
 };
 
 const Index = () => {
-  const { viewingHistory, mediaItems, stats, isProcessing, error, handleFileUpload, handleReset } =
-    useNetflixHistory();
+  const {
+    error,
+    viewingHistory,
+    mediaItems,
+    partialMediaItems,
+    stats,
+    isProcessing,
+    progress,
+    handleFileUpload,
+    handleReset,
+  } = useNetflixHistory();
 
   if (viewingHistory.length === 0 && !isProcessing) {
     return (
@@ -230,7 +288,7 @@ const Index = () => {
     <div className="container mx-auto py-8 space-y-8">
       {renderHeader(handleReset)}
       {error && renderError(error)}
-      {isProcessing && renderLoading()}
+      {isProcessing && renderLoading(progress, partialMediaItems)}
       {!isProcessing && stats && renderResults(mediaItems, stats)}
     </div>
   );

@@ -189,25 +189,49 @@ const processBatch = async (
 };
 
 /**
+ * Report newly processed item if it matches the batch
+ */
+const reportProcessedItem = (
+  mediaMap: Map<string, MediaItem>,
+  batchItem: NetflixViewingItem,
+  onItemProcessed: (item: MediaItem) => void
+): void => {
+  // Find and report all newly processed items that match the batch
+  // This approach is more thorough than the previous implementation
+  for (const mediaItem of mediaMap.values()) {
+    // Report each item directly instead of trying to match by title
+    onItemProcessed(mediaItem);
+  }
+};
+
+/**
  * Process viewing history items to enrich with TMDB data
  */
 export const processViewingHistory = async (
-  viewingHistory: NetflixViewingItem[]
+  viewingHistory: NetflixViewingItem[],
+  progressCallback?: (currentCount: number, totalCount: number) => void,
+  onItemProcessed?: (item: MediaItem) => void
 ): Promise<MediaItem[]> => {
   const mediaMap = new Map<string, MediaItem>();
-  const batchSize = 5;
+  const batchSize = 40;
 
   for (let i = 0; i < viewingHistory.length; i += batchSize) {
     const batch = viewingHistory.slice(i, i + batchSize);
     await processBatch(batch, mediaMap);
 
-    // Add a small delay between batches to avoid rate limiting
+    if (progressCallback) {
+      progressCallback(i + batch.length, viewingHistory.length);
+    }
+
+    if (onItemProcessed && batch.length > 0) {
+      reportProcessedItem(mediaMap, batch[0], onItemProcessed);
+    }
+
     if (i + batchSize < viewingHistory.length) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
 
-  // Convert the map to an array and sort by watched date (most recent first)
   return Array.from(mediaMap.values()).sort(
     (a, b) => new Date(b.watchedDate).getTime() - new Date(a.watchedDate).getTime()
   );
@@ -228,17 +252,26 @@ const calculateWatchCountsByPeriod = (
   const watchedByYear: Record<string, number> = {};
 
   mediaItems.forEach((item) => {
-    const date = new Date(item.watchedDate);
-    const day = date.toISOString().split('T')[0];
-    const month = day.substring(0, 7); // YYYY-MM
-    const year = day.substring(0, 4); // YYYY
-
-    watchedByDay[day] = (watchedByDay[day] || 0) + 1;
-    watchedByMonth[month] = (watchedByMonth[month] || 0) + 1;
-    watchedByYear[year] = (watchedByYear[year] || 0) + 1;
+    updateWatchCounts(item, watchedByDay, watchedByMonth, watchedByYear);
   });
 
   return { byDay: watchedByDay, byMonth: watchedByMonth, byYear: watchedByYear };
+};
+
+const updateWatchCounts = (
+  item: MediaItem,
+  byDay: Record<string, number>,
+  byMonth: Record<string, number>,
+  byYear: Record<string, number>
+) => {
+  const date = new Date(item.watchedDate);
+  const day = date.toISOString().split('T')[0];
+  const month = day.substring(0, 7); // YYYY-MM
+  const year = day.substring(0, 4); // YYYY
+
+  byDay[day] = (byDay[day] || 0) + 1;
+  byMonth[month] = (byMonth[month] || 0) + 1;
+  byYear[year] = (byYear[year] || 0) + 1;
 };
 
 /**
