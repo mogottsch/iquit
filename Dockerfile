@@ -2,6 +2,10 @@ FROM node:20-alpine as build
 
 WORKDIR /app
 
+# Accept build argument for API key
+ARG VITE_TMDB_API_KEY
+ENV VITE_TMDB_API_KEY=$VITE_TMDB_API_KEY
+
 # Copy package.json and lock file
 COPY package.json pnpm-lock.yaml ./
 
