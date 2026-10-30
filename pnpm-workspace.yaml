@@ -1,0 +1,7 @@
+# Keep unreviewed dependency scripts blocked; approve only the locked build tools.
+strictDepBuilds: true
+allowBuilds:
+  # Native compiler used by @vitejs/plugin-react-swc.
+  '@swc/core@1.11.21': true
+  # Binary installers used by Vite and lovable-tagger, respectively.
+  'esbuild@0.21.5 || 0.25.2': true
