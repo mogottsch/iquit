@@ -7,10 +7,10 @@ ARG VITE_TMDB_API_KEY
 ENV VITE_TMDB_API_KEY=$VITE_TMDB_API_KEY
 
 # Copy package.json and lock file
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Install the pnpm version verified with this lockfile and build policy
+RUN corepack enable && corepack prepare pnpm@12.16.1 --activate
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
