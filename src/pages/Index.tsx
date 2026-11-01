@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/useToast';
+import { usePublicPageview } from '@/hooks/usePublicPageview';
 import { parseNetflixCSV } from '@/services/csvService';
 import {
   processViewingHistory,
@@ -435,6 +436,18 @@ const Index = () => {
   } = useNetflixHistory();
 
   const [dataLoaded, setDataLoaded] = useState(false);
+
+  usePublicPageview(
+    dataLoaded &&
+      showLandingPage &&
+      !isProcessing &&
+      !error &&
+      viewingHistory.length === 0 &&
+      mediaItems.length === 0 &&
+      partialMediaItems.length === 0 &&
+      !stats,
+    dataLoaded
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => {
