@@ -24,6 +24,25 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up frontend test runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+
+      - name: Install pinned frontend prerequisites
+        run: |
+          npm install --global corepack@0.34.5
+          corepack enable
+          corepack prepare pnpm@12.16.1 --activate
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+
+      - name: Verify public analytics privacy
+        run: |
+          pnpm exec eslint src/hooks/usePublicPageview.ts playwright.config.ts 'tests/**/*.ts'
+          pnpm exec tsc -p tsconfig.analytics.json
+          pnpm test:analytics
+
       - name: Decide publication eligibility
         id: publication
         env:
