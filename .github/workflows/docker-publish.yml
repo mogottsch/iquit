@@ -31,6 +31,7 @@ jobs:
 
       - name: Install pinned frontend prerequisites
         run: |
+          npm install --global corepack@0.34.5
           corepack enable
           corepack prepare pnpm@12.16.1 --activate
           pnpm install --frozen-lockfile
